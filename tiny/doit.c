@@ -15,7 +15,7 @@ void doit(int fd) {
   struct stat sbuf;
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
   char filename[MAXLINE], cgiargs[MAXLINE];
-  rio_t rio;
+  rio_t rio; /* client와 연결된 소켓을 갖고있음 */
 
   /* 1) client의 request를 읽음 */
   Rio_readinitb(&rio, fd); /* init buffer & connect fd(already opend) */
