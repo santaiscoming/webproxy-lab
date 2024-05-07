@@ -1,1 +1,0 @@
-void doit(int fd);

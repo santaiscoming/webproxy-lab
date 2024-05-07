@@ -6,18 +6,8 @@
  * Updated 11/2019 droh
  *   - Fixed sprintf() aliasing issue in serve_static(), and clienterror().
  */
+#include "tiny.h"
 #include "csapp.h"
-#include "doit.h"
-
-void doit(int fd);
-void read_requesthdrs(rio_t *rp);
-int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
-void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
-void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
-                 char *longmsg);
-void handle_SIGCHLD(int sig);
 
 int main(int argc, char **argv) {
   int listenfd, connfd;
@@ -49,10 +39,15 @@ int main(int argc, char **argv) {
   }
 }
 
-/*
-  clienterror() : 에러 메세지(Http body)를 클라이언트에게 전송
-*/
-
+/**
+ * @brief 클라이언트에게 에러 메시지를 보내는 함수
+ *
+ * @param fd 클라이언트와 연결된 파일 디스크립터
+ * @param cause 에러의 원인
+ * @param errnum 에러 번호
+ * @param shortmsg 에러 메시지
+ * @param longmsg 에러 메시지(긴 버전)
+ */
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg) {
   char buf[MAXLINE], body[MAXBUF];
@@ -78,10 +73,11 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
   Rio_writen(fd, body, strlen(body));
 }
 
-/*
-  read_requesthdrs - 단순히 요청 헤더를 읽고 출력한다.
-  @rp : rio_t 구조체 포인터
-*/
+/**
+ * @brief 요청 헤더를 읽고 출력하는 함수
+ *
+ * @param rp rio_t 구조체 포인터
+ */
 void read_requesthdrs(rio_t *rp) {
   char buf[MAXLINE];
 
@@ -93,26 +89,29 @@ void read_requesthdrs(rio_t *rp) {
   }
 }
 
-/*
-  parse_uri() : uri를 분석하여 정적인지 동적인지 확인
-  @uri : uri
-  @filename : 파일 이름
-  @cgi_args : cgi 인자
-  - cgi : 웹서버가 동적 컨텐츠를 제공하기 위해 사용하는 기술 (common gateway
+/**
+ * @brief uri를 분석하여 정적인지 동적인지 확인
+ *
+ * @param uri uri
+ * @param filename 파일 이름
+ * @param cgi_args cgi 인자
+ *
+ * @return int (정적컨텐츠) ? 1 : 0
+ *
+ * @details
+  cgi : 웹서버가 동적 컨텐츠를 제공하기 위해 사용하는 기술 (common gateway
   interface) (like 서버사이드 렌더링)
    - 웹서버에 폴더를 지정하고, 해당 폴더에 있는 파일을 CGI 프로그램에게 전달
    - CGI 프로그램은 DB와 통신해 웹서버에게 결과를 전달
    - 웹서버는 결과를 클라이언트에게 전달
-*/
 
+   웹서버가 return하는 모든 내용은 서버과 관리하는 연관된다.
+   즉, 해당 파일든은 모두 URI를 갖고있다
+   다시말해서 URI를 분석해 정적인지 동적인지 알 수 있다.
+   (단, 정적과 동적이 따로 관리되어야한다는 가정이 있긴하다)
+ */
 int parse_uri(char *uri, char *filename, char *cgi_args) {
   char *cgi_arg_p;
-
-  /* 웹서버가 return하는 모든 내용은 서버과 관리하는 연관된다.
-     즉, 해당 파일든은 모두 URI를 갖고있다
-     다시말해서 URI를 분석해 정적인지 동적인지 알 수 있다.
-     (단, 정적과 동적이 따로 관리되어야한다는 가정이 있긴하다)
-   */
 
   /* uri에 표현되는 폴더가 cgi-bin인가? 즉, 동적컨텐츠인가 ? */
   if (!strstr(uri, "cgi-bin")) { /* 정적 컨텐츠 */
@@ -138,12 +137,15 @@ int parse_uri(char *uri, char *filename, char *cgi_args) {
   }
 }
 
-/*
-  serve_dynamic() :  자식 프로세스를 생성 후 CGI를 통해 동적컨텐츠 실행 후 제공
-  1. 성공 응답 보내기
-  2. CGI 실행 후 동적 컨텐츠 serve
+/**
+ * @brief 자식 프로세스를 생성후 CGI를 통해 동적 컨텐츠를 제공하는 함수
+ * @details
+   1. 성공(200)했다는 res(header)를 클라이언트에게 보낸다
+   2. CGI 프로그램을 실행한다
+ * @param fd 클라이언트와 연결된 파일 디스크립터
+ * @param filename 파일 이름
+ * @param cgiargs CGI 인자
 */
-
 void serve_dynamic(int fd, char *filename, char *cgiargs) {
   char buf[MAXLINE], *emptylist[] = {NULL};
 
@@ -165,11 +167,20 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
   }
 }
 
+/**
+ * @brief 클라이언트에게 정적 컨텐츠를 제공하는 함수
+ * @details
+   1. res(header)를 클라이언트에게 보낸다
+   2. res(body)를 클라이언트에게 보낸다
+ * @param fd 클라이언트와 연결된 파일 디스크립터
+ * @param filename 파일 이름
+ * @param filesize 파일 크기
+ */
 void serve_static(int fd, char *filename, int filesize) {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
-  /* res(header)를 클라이언트에게 보낸다. */
+  /* 1. res(header)를 클라이언트에게 보낸다. */
   get_filetype(filename, filetype);
   sprintf(buf, "HTTP/1.1 200 OK\r\n");
   sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
@@ -188,6 +199,12 @@ void serve_static(int fd, char *filename, int filesize) {
   Munmap(srcp, filesize); /* 매핑한 메모리 해제 */
 }
 
+/**
+ * @brief 파일의 타입을 가져오는 함수
+ *
+ * @param filename 파일 이름
+ * @param filetype 파일 타입을 저장할 buffer
+ */
 void get_filetype(char *filename, char *filetype) {
   if (strstr(filename, ".html")) {
     strcpy(filetype, "text/html");
@@ -213,21 +230,21 @@ void get_filetype(char *filename, char *filetype) {
     strcpy(filetype, "text/plain");
   }
 }
-/*
-  sigchild_handler() : 자식 프로세스가 종료되면 호출되는 시그널 핸들러
-  @ sig : SIGCHLD
-  -> os에 핸들러를 등록후 해당하는 signal 발생시 핸들러 호출 (observer pattern)
-  @sig : 시그널 번호 (SIGCHLD 가 들어오면 호출)
 
+/**
+ * @brief os에 등록하는 자식 프로세스가 종료되면 호출되는 시그널 핸들러
+ * (observer pattern)
+ *
+ * @param sig SIGCHLD signal
+ * @details
   Q. waitpid는 해당 pid의 자식 프로세스가 종료될때까지 기다린다.
   그렇다는 의미는 기존의 부모를 Wait(Null)로 블록킹하는거랑 차이가 없다.
   그렇다면 왜 waitpid를 사용하는가?
 
   A. waitpid는 WNOHANG 옵션을 사용할 수 있다.
   이 옵션을 사용시에 자식프로세스가 종료되지 않더라도 부모프로세스를 블록하지
-  않는다
-*/
-
+  않는다.
+ */
 void handle_SIGCHLD(int sig) {
   int saved_errno = errno;
 

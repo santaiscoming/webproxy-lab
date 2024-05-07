@@ -16,8 +16,8 @@ csapp.o: csapp.c
 cgi:
 	(cd cgi-bin; make)
 
-doit.o: doit.c
-	$(CC) $(CFLAGS) -c doit.c
+doit.o: doit.c tiny.h
+	$(CC) $(CFLAGS) -c doit.c tiny.h
 
 clean:
 	rm -f *.o tiny *~

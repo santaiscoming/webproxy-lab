@@ -1,17 +1,10 @@
-#include "csapp.h"
+#include "tiny.h"
 
-void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
-                 char *longmsg);
-void read_requesthdrs(rio_t *rp);
-int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
-/*
-  doit() : 클라이언트의 요청을 읽고 파싱하여 정적 컨텐츠인지 동적 컨텐츠인지
-  확인하고 요청에 따라 정적 컨텐츠를 제공하거나 동적 컨텐츠를 제공한다.
-
-  @fd : 식별자
-*/
+/**
+ * @brief 클라이언트의 요청을 읽고 파싱하여 동적, 정적컨텐츠를 제공
+ *
+ * @param fd : 클라이언트와 연결된 파일 디스크립터
+ */
 void doit(int fd) {
   /*
     - is_static : 정적 컨텐츠인지 동적 컨텐츠인지 확인하는 변수
@@ -71,9 +64,3 @@ void doit(int fd) {
     serve_dynamic(fd, filename, cgiargs);
   }
 }
-
-/*
-  stat(char *path, struct stat *statbuf) : 파일의 상태정보를 가져옴
-  @ path : 파일 경로
-  @ statbuf : 파일의 상태정보를 저장할 구조체의 주소
-*/
