@@ -1,5 +1,11 @@
 #include "csapp.h"
 
+void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
+                 char *longmsg);
+void read_requesthdrs(rio_t *rp);
+int parse_uri(char *uri, char *filename, char *cgiargs);
+void serve_static(int fd, char *filename, int filesize);
+void serve_dynamic(int fd, char *filename, char *cgiargs);
 /*
   doit() : 클라이언트의 요청을 읽고 파싱하여 정적 컨텐츠인지 동적 컨텐츠인지
   확인하고 요청에 따라 정적 컨텐츠를 제공하거나 동적 컨텐츠를 제공한다.
@@ -20,7 +26,8 @@ void doit(int fd) {
 
   /* 1) client의 request를 읽음 */
   Rio_readinitb(&rio, fd); /* init buffer & connect fd(already opend) */
-  Rio_readlineb(&rio, buf, MAXLINE); /* read request line */
+  if (!Rio_readlineb(&rio, buf, MAXLINE))  // line:netp:doit:readrequest
+    return;
   printf("Request headers:\n");
   printf("%s", buf);
   sscanf(buf, "%s %s %s", method, uri, version);
@@ -38,7 +45,7 @@ void doit(int fd) {
   is_static = parse_uri(uri, filename, cgiargs);
 
   /* 2-1) 파일 존재 확인 */
-  if (stat(filename, &sbuf) == -1) { /* 파일의 상태정보를 sbuf에 저장한다. */
+  if (stat(filename, &sbuf) < 0) { /* 파일의 상태정보를 sbuf에 저장한다. */
     clienterror(fd, filename, "404", "Not found",
                 "Tiny couldn't find this file");
     return;
