@@ -17,6 +17,7 @@ void get_filetype(char *filename, char *filetype);
 void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg);
+void handle_SIGCHLD(int sig);
 
 int main(int argc, char **argv) {
   int listenfd, connfd;
@@ -27,6 +28,11 @@ int main(int argc, char **argv) {
   /* Check command line args */
   if (argc != 2) {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
+    exit(1);
+  }
+
+  if (Signal(SIGCHLD, handle_SIGCHLD) == SIG_ERR) {
+    fprintf(stderr, "Signal error\n");
     exit(1);
   }
 
@@ -85,8 +91,6 @@ void read_requesthdrs(rio_t *rp) {
     Rio_readlineb(rp, buf, MAXLINE);
     printf("%s", buf);
   }
-
-  return;
 }
 
 /*
@@ -152,14 +156,13 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
   if (Fork() == 0) {
     /*QUERY_STRING은 CGI 스펙에 정의된 환경 변수 이름
       - 웹서버가 브라우저로 부터 받은 정보를 CGI에게 넘겨줄때
-      - CGI가 실행하기 위한 정보(cgiargs)를 환경변수(QUERY_STRING)으로 넘겨준다
+      - CGI가 실행하기 위한 정보(cgiargs)를 환경변수(QUERY_STRING)으로
+      넘겨준다
     */
     setenv("QUERY_STRING", cgiargs, 1);
     Dup2(fd, STDOUT_FILENO); /* 자식의 표준 출력을 연결 파일 식별자로 재지정 */
     Execve(filename, emptylist, environ); /* CGI prog 실행 */
   }
-
-  Wait(NULL); /* 부모는 자식 프로세스가 종료될때까지 기다린다. */
 }
 
 void serve_static(int fd, char *filename, int filesize) {
@@ -209,6 +212,29 @@ void get_filetype(char *filename, char *filetype) {
   else {
     strcpy(filetype, "text/plain");
   }
+}
+/*
+  sigchild_handler() : 자식 프로세스가 종료되면 호출되는 시그널 핸들러
+  @ sig : SIGCHLD
+  -> os에 핸들러를 등록후 해당하는 signal 발생시 핸들러 호출 (observer pattern)
+  @sig : 시그널 번호 (SIGCHLD 가 들어오면 호출)
+
+  Q. waitpid는 해당 pid의 자식 프로세스가 종료될때까지 기다린다.
+  그렇다는 의미는 기존의 부모를 Wait(Null)로 블록킹하는거랑 차이가 없다.
+  그렇다면 왜 waitpid를 사용하는가?
+
+  A. waitpid는 WNOHANG 옵션을 사용할 수 있다.
+  이 옵션을 사용시에 자식프로세스가 종료되지 않더라도 부모프로세스를 블록하지
+  않는다
+*/
+
+void handle_SIGCHLD(int sig) {
+  int saved_errno = errno;
+
+  while (waitpid((pid_t)-1, 0, WNOHANG) > 0) {
+  };
+
+  errno = saved_errno;
 }
 
 /*
@@ -273,4 +299,13 @@ void get_filetype(char *filename, char *filetype) {
   Munmap(void *start, size_t length) : 메모리 매핑 해제 ("un"map)
 
   Open(char *filename, int flags, mode_t mode) : 파일을 열고 디스크립터를 반환
+
+  ref 3) waitpid(pid_t pid, int *status, int options) : 자식프로세스(pid)가
+  종료될때 기다렸다 수거
+  @ pid : 자식 프로세스의 pid
+  @ status : 자식 프로세스의 종료 상태를 담을 포인터
+  @ options : waitpid() 의 동작제어 flag
+    - WNOHANG : 자식 프로세스가 종료되지 않아도 부모를 블록하지 않는다
+    - WUNTRACED : 정지된 자식프로세스의 상태 변경도 status에 저장한다
+    - WCONTINUED : 자식 프로세스가 SIGCONT로 재개된 상태를 반환한다
 */
