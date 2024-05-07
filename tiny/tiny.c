@@ -194,6 +194,10 @@ void get_filetype(char *filename, char *filetype) {
     strcpy(filetype, "image/gif");
   }
 
+  else if (strstr(filename, ".mpg")) {
+    strcpy(filetype, "video/mpeg");
+  }
+
   else if (strstr(filename, ".png")) {
     strcpy(filetype, "image/png");
   }
