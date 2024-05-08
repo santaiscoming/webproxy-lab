@@ -25,8 +25,14 @@ void doit(int fd) {
   printf("%s", buf);
   sscanf(buf, "%s %s %s", method, uri, version);
 
-  /* GET 메서드가 아니면 return (strcasecmp 는 두 문자열이 같은면 return 0)*/
-  if (strcasecmp(method, "GET")) {
+  /*
+    GET 메서드가 아니면 return (strcasecmp 는 두 문자열이 같은면 return 0)
+    telnet을 이용해 확인 가능
+      - telnet localhost 8000
+      - HEAD /home.html HTTP/1.1
+      - HOST: localhost:8000
+  */
+  if (!(strcasecmp(method, "GET") == 0 || strcasecmp(method, "HEAD") == 0)) {
     clienterror(fd, method, "501", "Not Implemented",
                 "Tiny does not implement this method");
     return;
@@ -52,7 +58,7 @@ void doit(int fd) {
       return;
     }
 
-    serve_static(fd, filename, sbuf.st_size);
+    serve_static(fd, filename, sbuf.st_size, method);
   } else { /* 동적 컨텐츠 */
     if (!(S_ISREG(sbuf.st_mode)) ||
         !(S_IXUSR & sbuf.st_mode)) { /* 실행 가능한 파일인지 확인 */
@@ -61,6 +67,6 @@ void doit(int fd) {
       return;
     }
 
-    serve_dynamic(fd, filename, cgiargs);
+    serve_dynamic(fd, filename, cgiargs, method);
   }
 }

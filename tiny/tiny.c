@@ -170,7 +170,7 @@ int parse_uri(char *uri, char *filename, char *cgi_args) {
  * @param filename 파일 이름
  * @param cgiargs CGI 인자
 */
-void serve_dynamic(int fd, char *filename, char *cgiargs) {
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method) {
   char buf[MAXLINE], *emptylist[] = {NULL};
 
   /* 1. 성공(200)했다는 res(header)를 클라이언트에게 보낸다 */
@@ -186,8 +186,14 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
       넘겨준다
     */
     setenv("QUERY_STRING", cgiargs, 1);
-    Dup2(fd, STDOUT_FILENO); /* 자식의 표준 출력을 연결 파일 식별자로 재지정
-    // */
+    /* -------------- after 11.11 -------------- */
+    setenv("REQUEST_METHOD", method, 1);  // before 11.11 is removed
+
+    Dup2(fd, STDOUT_FILENO); /* 자식의 표준 출력을 연결 파일 식별자로 재지정 */
+    /*
+      자식 프로세스의 표준출력(printf)을 fd로 재지정했기 때문에 CGI 프로그램은
+      표준출력을 통해 클라이언트에게 결과를 보낼 수 있다.
+    */
     Execve(filename, emptylist, environ); /* CGI prog 실행 */
   }
   /*
@@ -209,7 +215,7 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
  * @param filename 파일 이름
  * @param filesize 파일 크기
  */
-void serve_static(int fd, char *filename, int filesize) {
+void serve_static(int fd, char *filename, int filesize, char *method) {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
@@ -223,6 +229,12 @@ void serve_static(int fd, char *filename, int filesize) {
   Rio_writen(fd, buf, strlen(buf)); /* buf에 저장된 헤더를 fd에 작성 */
   printf("Response headers:\n");
   printf("%s", buf);
+
+  /*
+    -------------- after 11.11 --------------
+    클라이언트 요청이 **HEAD** 메서드일때 body를 보내지 않는다.
+  */
+  if (strcasecmp(method, "HEAD") == 0) return;  // before 11.11 is removed
 
   /* 2. res(body)를 클라이언트에게 보낸다. */
   srcfd = Open(filename, O_RDONLY, 0); /* 파일 오픈 */

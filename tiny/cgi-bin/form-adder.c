@@ -32,8 +32,16 @@ int main(void) {
   /* Generate the HTTP response */
   printf("Connection: close\r\n");
   printf("Content-length: %d\r\n", (int)strlen(content));
-  printf("Content-type: text/html\r\n\r\n");
-  printf("%s", content);
+  printf("Content-type: text/html\r\n\r\n"); /* \r\n\r\n로 헤더와 바디를 구분 */
+
+  /*
+    -------------- after 11.11 --------------
+    HEAD 메서드일 경우 바디를 출력하지 않는다.
+  */
+  if (!!strcasecmp(getenv("REQUEST_METHOD"), "HEAD")) {
+    printf("%s", content); /* 바디 출력 */
+  }
+
   fflush(stdout);
   exit(0);
 }

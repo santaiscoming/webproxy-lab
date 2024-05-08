@@ -5,8 +5,8 @@
 
 void doit(int fd);
 
-void serve_static(int fd, char *filename, int filesize);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
+void serve_static(int fd, char *filename, int filesize, char *method);
+void serve_dynamic(int fd, char *filename, char *cgiargs, char *method);
 
 void read_requesthdrs(rio_t *rp);
 
