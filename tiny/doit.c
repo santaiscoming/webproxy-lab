@@ -7,15 +7,15 @@
  */
 void doit(int fd) {
   /*
-    - is_static : 정적 컨텐츠인지 동적 컨텐츠인지 확인하는 변수
-    - sbuf : 파일의 상태정보를 저장하는 구조체
+    @var rio : rio_t 구조체
+    - 클라이언트와 연결된 connfd를 갖고 있기에 read, write 할 때 사용
   */
 
   int is_static;
   struct stat sbuf;
   char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
   char filename[MAXLINE], cgiargs[MAXLINE];
-  rio_t rio; /* client와 연결된 소켓을 갖고있음 */
+  rio_t rio;
 
   /* 1) client의 request를 읽음 */
   Rio_readinitb(&rio, fd); /* init buffer & connect fd(already opend) */

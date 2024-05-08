@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  /* after 11.8 */
   if (Signal(SIGCHLD, handle_SIGCHLD) == SIG_ERR) {
     fprintf(stderr, "Signal error\n");
     exit(1);
@@ -183,9 +184,18 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
       넘겨준다
     */
     setenv("QUERY_STRING", cgiargs, 1);
-    Dup2(fd, STDOUT_FILENO); /* 자식의 표준 출력을 연결 파일 식별자로 재지정 */
+    Dup2(fd, STDOUT_FILENO); /* 자식의 표준 출력을 연결 파일 식별자로 재지정
+    // */
     Execve(filename, emptylist, environ); /* CGI prog 실행 */
   }
+  /*
+    Wait()는 자식 프로세스가 종료될때까지 기다리고 회수한다.
+    즉, Wait를 없애면 system call로 회수하지 않았을때 zombie process가 된다.
+  */
+  /* before 11.8 */
+  // Wait(NULL); /* 부모는 자식이 끝날때까지 기다린다. */
+  /* after 11.8 */
+  // remove Wait(NULL) -> handle_SIGCHLD()로 대체
 }
 
 /**
@@ -215,23 +225,22 @@ void serve_static(int fd, char *filename, int filesize) {
   /* 2. res(body)를 클라이언트에게 보낸다. */
   srcfd = Open(filename, O_RDONLY, 0); /* 파일 오픈 */
 
-  /* before : 11.9 */
-  /*
+  /* -------------- before : 11.9 --------------
     Mmap을 사용시에 파일의 데이터가 복사되는게 아니라 가상 메모리 주소가 파일의
-    데이터를 가르키도록 설정한다
+    데이터를 가르키도록 설정한다.
+    실제 데이터를 접근할때 메모리에 로드(레이지로딩)하기 떄문에 효율적이다.
   */
   // srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0); /* 파일 매핑 */
   // Close(srcfd);
   // Rio_writen(fd, srcp, filesize);
   // Munmap(srcp, filesize); /* 매핑한 메모리 해제 */
 
-  /* after : 11.9 */
-  srcp = (char *)Malloc(filesize); /* 파일크기만큼 할당해야한다. */
-  /*
+  /* -------------- after : 11.9 --------------
     before와의 차이점 : Rio_readn()
     -> malloc으로 할당한 메모리에 파일을 담기위해서는 파일을 읽어야한다.
-    즉, 파일을 복사해서 저장해야한다
+    즉, malloc에 써줄 데이터를 읽어야한다.(malloc에 넣는다.)
    */
+  srcp = (char *)Malloc(filesize);  /* 파일크기만큼 할당해야한다. */
   Rio_readn(srcfd, srcp, filesize); /* 파일을 읽고 srcp에 저장 */
   Close(srcfd);
   Rio_writen(fd, srcp, filesize); /* 클라이언트에게 파일을 보낸다 */
