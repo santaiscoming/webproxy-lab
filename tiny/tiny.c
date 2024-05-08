@@ -20,7 +20,8 @@ int main(int argc, char **argv) {
    */
 
   int listenfd, connfd;
-  char hostname[MAXLINE], port[MAXLINE];
+  char hostname[MAXLINE], client_port[MAXLINE];
+  char *service_port = NULL;
   socklen_t clientlen;
   struct sockaddr_storage clientaddr;
 
@@ -36,7 +37,8 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  listenfd = Open_listenfd(port); /* listen 소켓 open */
+  service_port = argv[1];
+  listenfd = Open_listenfd(service_port); /* listen 소켓 open */
   /*
     이 루프에 대해서 한번 생각해보자 클라이언트가 connect를 보낼때가지 기다리고
     있다가 doit 을 호출한 이후 connfd를 close한다. 다시말해서 요청을 처리한
@@ -49,9 +51,9 @@ int main(int argc, char **argv) {
     clientlen = sizeof(clientaddr);
     /* 반복적으로 연결 요청 -> ref.1 */
     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, port, MAXLINE,
-                0);
-    printf("Accepted connection from (%s, %s)\n", hostname, port);
+    Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE, client_port,
+                MAXLINE, 0);
+    printf("Accepted connection from (%s, %s)\n", hostname, client_port);
     doit(connfd); /* 트랜잭션 수행 */
     Close(connfd);
   }
@@ -142,6 +144,7 @@ int parse_uri(char *uri, char *filename, char *cgi_args) {
     strcat(filename, uri);
     /* uri가 '/'로 끝나면 home.html(기본파일)로 변환 */
     if (uri[strlen(uri) - 1] == '/') strcat(filename, "home.html");
+
     return 1;
   } else {                       /* 동적 컨텐츠 */
     cgi_arg_p = index(uri, '?'); /* cgi argument 추출*/
@@ -175,7 +178,6 @@ void serve_dynamic(int fd, char *filename, char *cgiargs) {
   Rio_writen(fd, buf, strlen(buf));
   sprintf(buf, "Server: Tiny Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
-
   if (Fork() == 0) {
     /*
       QUERY_STRING은 CGI 스펙에 정의된 환경 변수 이름
